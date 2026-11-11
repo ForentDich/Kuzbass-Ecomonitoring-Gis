@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+rasterio
+geopandas
+shapely
+numpy
+sqlalchemy
+geoalchemy2
+celery
+redis
+boto3

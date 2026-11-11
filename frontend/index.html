@@ -1,0 +1,517 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ЭкоМониторинг Кузбасса // ГИС-модуль</title>
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;500;600&display=swap">
+  <style>
+    :root {
+      --black: #021B1A;
+      --dark-green: #032221;
+      --green: #03624C;
+      --forest: #095544;
+      --pine: #06302B;
+      --basil: #0B453A;
+      --accent: #00DF81;
+      --meadow: #2CC295;
+      --white: #F1F7F6;
+      --pistachio: #AACBC4;
+      --stone: #707D7D;
+      --border: #AACBC4;
+    }
+
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      color: var(--black);
+      background: var(--white);
+      font: 13px Inter, Arial, sans-serif;
+    }
+    button, input, select { font: inherit; }
+    button { cursor: pointer; }
+
+    .topbar {
+      height: 48px;
+      flex-shrink: 0;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 0 12px;
+      box-sizing: border-box;
+      background: var(--white);
+      border-bottom: 1px solid var(--border);
+    }
+    .brand {
+      min-width: 290px;
+      color: var(--black);
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .brand-mark {
+      margin-right: 8px;
+      color: var(--green);
+      font: 600 15px "Roboto Mono", monospace;
+    }
+    .tabs {
+      height: 100%;
+      display: flex;
+      align-items: stretch;
+      justify-content: center;
+      gap: 4px;
+    }
+    .tabs button {
+      border: 0;
+      border-bottom: 2px solid transparent;
+      padding: 0 12px;
+      color: var(--stone);
+      background: transparent;
+      white-space: nowrap;
+    }
+    .tabs button:hover { color: var(--dark-green); background: #FFFFFF; }
+    .tabs button.active { color: var(--green); border-bottom-color: var(--green); }
+    .toolbar-right {
+      min-width: 560px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+    .coords {
+      color: var(--basil);
+      font: 11px "Roboto Mono", monospace;
+      white-space: nowrap;
+    }
+    .quick-jump, .draw-button {
+      height: 32px;
+      border: 1px solid var(--green);
+      border-radius: 3px;
+      white-space: nowrap;
+    }
+    .quick-jump {
+      max-width: 210px;
+      padding: 0 8px;
+      color: var(--basil);
+      background: #FFFFFF;
+      font-size: 11px;
+    }
+    .draw-button {
+      padding: 0 12px;
+      color: var(--black);
+      background: var(--accent);
+      font-weight: 700;
+    }
+    .draw-button:hover { background: var(--meadow); }
+
+    .workspace {
+      flex: 1;
+      display: flex;
+      width: 100%;
+      height: calc(100vh - 48px);
+      overflow: hidden;
+      min-height: 0;
+    }
+    .sidebar {
+      width: 320px;
+      flex-shrink: 0;
+      height: 100%;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      padding: 10px 12px;
+      background: var(--white);
+      border-right: 1px solid var(--border);
+    }
+    .block {
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .block:first-child { padding-top: 0; }
+    .block-title {
+      margin: 0 0 8px;
+      color: var(--basil);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .layer-row {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      margin: 7px 0;
+      color: var(--dark-green);
+      font-size: 12px;
+    }
+    .layer-row input {
+      appearance: none;
+      width: 14px;
+      height: 14px;
+      margin: 0;
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      background: #FFFFFF;
+    }
+    .layer-row input:checked {
+      border-color: var(--green);
+      background: var(--accent);
+    }
+    .layer-row input:checked::after {
+      content: "✓";
+      display: block;
+      color: var(--black);
+      font-size: 11px;
+      font-weight: 700;
+      line-height: 13px;
+      text-align: center;
+    }
+    .metrics {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .metrics td {
+      padding: 6px 0;
+      vertical-align: middle;
+      border-bottom: 1px solid var(--border);
+      color: var(--stone);
+      font-size: 12px;
+    }
+    .metrics td:last-child {
+      color: var(--dark-green);
+      font: 600 13px "Roboto Mono", monospace;
+      text-align: right;
+      white-space: nowrap;
+    }
+    .section-note {
+      margin: 0;
+      color: var(--stone);
+      font-size: 11px;
+      line-height: 1.5;
+    }
+    .mode-panel { display: none; }
+    .mode-panel.active { display: block; }
+    .legend {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      height: 10px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+    .legend span:nth-child(1) { background: #E53935; }
+    .legend span:nth-child(2) { background: #FFB300; }
+    .legend span:nth-child(3) { background: #00DF81; }
+    .legend-labels {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 5px;
+      color: var(--stone);
+      font: 10px "Roboto Mono", monospace;
+    }
+    .control { margin: 10px 0; }
+    .control label {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      color: var(--dark-green);
+      font-size: 11px;
+    }
+    .control b { color: var(--green); font: 500 11px "Roboto Mono", monospace; }
+    input[type="range"] { width: 100%; accent-color: var(--green); }
+    .chart-container {
+      position: relative;
+      width: 100%;
+      height: 160px;
+    }
+    #dynamicsChart { width: 100% !important; height: 160px !important; }
+    .selection-hint {
+      margin: 0;
+      padding: 10px 12px;
+      border: 1px dashed var(--border);
+      border-radius: 3px;
+      color: var(--stone);
+      background: #FFFFFF;
+      font-size: 11px;
+      line-height: 1.45;
+    }
+    .selection-card { display: grid; gap: 8px; }
+    .selection-name { margin: 0; color: var(--green); font-size: 14px; }
+    .selection-meta, .index-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      color: var(--stone);
+      font-size: 11px;
+    }
+    .selection-meta b, .index-row b { color: var(--dark-green); }
+    .index-row { align-items: center; }
+    .index-value { font: 600 12px "Roboto Mono", monospace; }
+    .progress {
+      height: 7px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      background: #FFFFFF;
+    }
+    .progress span { display: block; height: 100%; }
+    .task-status { margin: 0; color: var(--stone); font-size: 10px; line-height: 1.4; }
+    .task-status.success { color: var(--green); }
+    .task-status.error { color: #B52E2E; }
+    .selection-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    .recalculate-button, .delete-button {
+      padding: 7px 9px;
+      border-radius: 3px;
+      font-size: 11px;
+    }
+    .recalculate-button {
+      border: 1px solid var(--green);
+      color: var(--black);
+      background: var(--accent);
+      font-weight: 700;
+    }
+    .delete-button {
+      border: 1px solid #D6A4A4;
+      color: #9B3737;
+      background: #FFFFFF;
+    }
+    .delete-button:hover { border-color: #B52E2E; color: #B52E2E; background: #FFF4F4; }
+    .polygon-list { display: grid; gap: 5px; margin-top: 9px; }
+    .polygon-list button {
+      padding: 6px 8px;
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      color: var(--basil);
+      background: #FFFFFF;
+      text-align: left;
+      font-size: 11px;
+    }
+    .polygon-list button:hover, .polygon-list button.active { border-color: var(--green); background: #E8F7F1; }
+    .polygon-item { display: flex; gap: 5px; }
+    .polygon-item button:first-child { flex: 1; }
+    .polygon-item .delete-button { padding: 5px 7px; }
+    .map-wrapper {
+      flex: 1;
+      position: relative;
+      height: 100%;
+      min-width: 0;
+    }
+    #map {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      width: 100%;
+      height: 100%;
+    }
+    .map-status {
+      position: absolute;
+      z-index: 3;
+      right: 14px;
+      bottom: 14px;
+      padding: 7px 9px;
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      color: var(--basil);
+      background: #FFFFFF;
+      font: 10px "Roboto Mono", monospace;
+    }
+    .drawing-hint {
+      position: absolute;
+      z-index: 4;
+      top: 10px;
+      left: 10px;
+      padding: 8px 10px;
+      border: 1px solid var(--green);
+      border-radius: 3px;
+      color: var(--dark-green);
+      background: #FFFFFF;
+      font: 11px "Roboto Mono", monospace;
+    }
+    .maplibregl-popup-content {
+      min-width: 240px;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      color: var(--black);
+      background: #FFFFFF;
+    }
+    .popup-title { margin-bottom: 10px; color: var(--green); font-weight: 700; }
+    .popup-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 4px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 11px;
+    }
+    .popup-row b { color: var(--dark-green); font-family: "Roboto Mono", monospace; }
+    .popup-actions { margin-top: 9px; }
+    .modal {
+      position: fixed;
+      z-index: 30;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      background: #021B1A66;
+    }
+    .modal-card {
+      width: 390px;
+      padding: 20px;
+      border: 1px solid var(--green);
+      border-radius: 3px;
+      background: #FFFFFF;
+    }
+    .modal-card h2 { margin: 0 0 17px; color: var(--dark-green); font-size: 15px; }
+    .field { margin: 13px 0; }
+    .field label { display: block; margin-bottom: 6px; color: var(--stone); font-size: 11px; }
+    .field input, .field select {
+      width: 100%;
+      padding: 9px;
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      outline: 0;
+      color: var(--dark-green);
+      background: #FFFFFF;
+    }
+    .field input:focus, .field select:focus { border-color: var(--green); }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 19px; }
+    .cancel-button {
+      padding: 7px 10px;
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      color: var(--basil);
+      background: var(--white);
+    }
+    .save-button {
+      padding: 7px 10px;
+      border: 1px solid var(--green);
+      border-radius: 3px;
+      color: var(--black);
+      background: var(--accent);
+      font-weight: 700;
+    }
+    .hidden { display: none !important; }
+    @media (max-width: 1100px) {
+      .brand { min-width: 220px; }
+      .toolbar-right { min-width: auto; }
+      .coords { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark">[+]</span>ЭкоМониторинг Кузбасса // ГИС-модуль</div>
+    <nav class="tabs" aria-label="Режимы">
+      <button class="active" data-mode="monitoring">Мониторинг</button>
+      <button data-mode="ndvi">Индекс NDVI</button>
+      <button data-mode="sandbox">Песочница рекультивации</button>
+    </nav>
+    <div class="toolbar-right">
+      <span id="coords" class="coords">Ш 54.283000 / Д 86.175000</span>
+      <select id="quick-jump" class="quick-jump" aria-label="Быстрый переход (Кузбасс)">
+        <option value="">Быстрый переход (Кузбасс)</option>
+        <option value="overview">Весь Кузбасс (обзор)</option>
+        <option value="bachatsky">Бачатский разрез</option>
+        <option value="taldinsky">Талдинский разрез</option>
+        <option value="krasnobrodsky">Краснобродский разрез</option>
+        <option value="mezhdurechensk">Разрезы Междуреченска</option>
+      </select>
+      <button id="draw-button" class="draw-button">+ Нарисовать участок</button>
+    </div>
+  </header>
+  <main class="workspace">
+    <aside class="sidebar">
+      <section id="monitoring-panel" class="mode-panel active">
+        <div class="block">
+          <h2 class="block-title">Сводные показатели</h2>
+          <table class="metrics">
+            <tr><td>Общая площадь нарушений</td><td id="total-area">0,0 га</td></tr>
+            <tr><td>Количество контуров</td><td id="feature-count">0</td></tr>
+            <tr><td>Средний NDVI</td><td id="mean-ndvi">0,00</td></tr>
+          </table>
+        </div>
+        <div class="block">
+          <h2 class="block-title">Статус мониторинга</h2>
+          <p class="section-note">Активный охват: Кемеровская область — Кузбасс<br>Обновление данных: 11.11.2026</p>
+        </div>
+        <div class="block">
+          <h2 class="block-title">Участки</h2>
+          <div id="monitoring-polygon-list" class="polygon-list" aria-label="Участки мониторинга"></div>
+        </div>
+        <div class="block">
+          <h2 class="block-title">Динамика площадей</h2>
+          <div class="chart-container"><canvas id="dynamicsChart"></canvas></div>
+        </div>
+      </section>
+      <section id="ndvi-panel" class="mode-panel">
+        <div class="block">
+          <h2 class="block-title">Слои</h2>
+          <label class="layer-row"><input id="satellite-toggle" type="checkbox" checked> Спутниковая подложка</label>
+          <label class="layer-row"><input id="outlines-toggle" type="checkbox" checked> Контуры нарушений</label>
+          <label class="layer-row"><input id="labels-toggle" type="checkbox" checked> Подписи объектов</label>
+        </div>
+        <div class="block">
+          <h2 class="block-title">Шкала вегетации (NDVI)</h2>
+          <div class="legend"><span></span><span></span><span></span></div>
+          <div class="legend-labels"><span>-1,00</span><span>0,25</span><span>0,45</span><span>1,00</span></div>
+        </div>
+        <div class="block">
+          <h2 class="block-title">Выбранный участок</h2>
+          <div id="selected-info">
+            <p class="selection-hint">Кликните по любому участку на карте, чтобы просмотреть его спектральные показатели и оценку состояния</p>
+          </div>
+        </div>
+        <div class="block">
+          <h2 class="block-title">Быстрый выбор участка</h2>
+          <div id="ndvi-polygon-list" class="polygon-list" aria-label="Быстрый выбор участка"></div>
+        </div>
+      </section>
+      <section id="sandbox-panel" class="mode-panel">
+        <div class="block">
+          <h2 class="block-title">Параметры сценария</h2>
+          <div class="control"><label>Плотность высадки саженцев <b id="seed-value">0%</b></label><input id="seedlings" type="range" min="0" max="100" value="0"></div>
+          <div class="control"><label>Интенсивность увлажнения и полива <b id="water-value">0%</b></label><input id="watering" type="range" min="0" max="100" value="0"></div>
+          <div class="control"><label>Горизонт прогнозирования <b id="years-value">1 год</b></label><input id="horizon" type="range" min="1" max="10" value="1"></div>
+          <button id="reset-simulation" class="cancel-button" type="button">Сбросить параметры</button>
+        </div>
+        <div class="block">
+          <h2 class="block-title">Прогнозные показатели</h2>
+          <table class="metrics">
+            <tr><td>Прогнозный средний NDVI</td><td id="forecast-mean-ndvi">0,00</td></tr>
+            <tr><td>Восстановлено (рекультивировано)</td><td id="forecast-reclaimed-area">0,0 га</td></tr>
+            <tr><td>Осталось нарушенных земель</td><td id="forecast-disturbed-area">0,0 га</td></tr>
+          </table>
+        </div>
+      </section>
+    </aside>
+    <div class="map-wrapper">
+      <div id="map"></div>
+      <div id="map-status" class="map-status">Зум 12.5 · Спутник Sentinel-2 / Esri | Кузбасс</div>
+      <div id="drawing-hint" class="drawing-hint hidden">КЛИК — ВЕРШИНА · ДВОЙНОЙ КЛИК — ЗАВЕРШИТЬ</div>
+    </div>
+  </main>
+  <div id="modal" class="modal hidden">
+    <form id="land-form" class="modal-card">
+      <h2>Сохранение нового участка</h2>
+      <div class="field"><label for="land-name">Название участка</label><input id="land-name" required placeholder="Например, Северный отвал"></div>
+      <div class="field"><label for="land-type">Тип объекта</label><select id="land-type"><option>Внешний отвал</option><option>Карьерная выемка</option><option>Участок рекультивации</option></select></div>
+      <div class="field"><label for="land-ndvi">Начальный NDVI</label><input id="land-ndvi" type="number" min="-1" max="1" step="0.01" value="0.15" required></div>
+      <div class="modal-actions"><button type="button" id="cancel-modal" class="cancel-button">Отмена</button><button type="submit" class="save-button">Сохранить участок</button></div>
+    </form>
+  </div>
+  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@turf/turf@7/turf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
